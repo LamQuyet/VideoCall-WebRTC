@@ -1,2 +1,2 @@
 # VideoCall-WebRTC
-Made by QuyetLV from Luc Ngạn - Bac Giang
+Made by QuyetLV from Luc Ngan - Bac Giang
