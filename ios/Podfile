@@ -12,6 +12,8 @@ target 'RandomCall' do
     :hermes_enabled => false
   )
 
+  pod 'ReactNativeIncallManager', :path => '../node_modules/react-native-incall-manager'
+
   target 'RandomCallTests' do
     inherit! :complete
     # Pods for testing

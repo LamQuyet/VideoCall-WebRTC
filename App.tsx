@@ -38,6 +38,8 @@ import {
   EventOnCandidate
 } from 'react-native-webrtc';
 import Icon from 'react-native-vector-icons/FontAwesome5';
+import InCallManager from 'react-native-incall-manager';
+import Feather from 'react-native-vector-icons/Feather';
 
 const MainScreen = () => {
 
@@ -51,6 +53,18 @@ const MainScreen = () => {
   const [id, setID] = useState([])
   const [callID, setCallID] = useState('')
   const [isFront, setIsFront] = useState(true)
+  const [mute, setMute] = useState(true)
+  const [camera, setCamera] = useState(true)
+
+  let timeout: any
+
+  // const ONE_SECOND_IN_MS = 1000;
+
+  // const PATTERN = [
+  //   1 * ONE_SECOND_IN_MS,
+  //   2 * ONE_SECOND_IN_MS,
+  //   3 * ONE_SECOND_IN_MS
+  // ];
 
   useEffect(() => {
     //connect to sever and create a peer
@@ -58,47 +72,15 @@ const MainScreen = () => {
     setUp()
   }, [])
 
-  // useEffect(() => {
-  //   mediaDevices.enumerateDevices().then(sourceInfos => {
-  //     console.log(sourceInfos);
-  //     let videoSourceId;
-  //     for (let i = 0; i < sourceInfos.length; i++) {
-  //       const sourceInfo = sourceInfos[i];
-  //       if (sourceInfo.kind == "videoinput" && sourceInfo.facing == (isFront ? "front" : "environment")) {
-  //         videoSourceId = sourceInfo.deviceId;
-  //       }
-  //     }
-  //     mediaDevices.getUserMedia({
-  //       audio: true,
-  //       video:
-  //       {
-  //         mandatory: {
-  //           minWidth: 640,
-  //           minHeight: 480,
-  //           minFrameRate: 30,
-  //         },
-  //         facingMode: (isFront ? "user" : "environment"),
-  //         optional: videoSourceId ? [{ sourceId: videoSourceId }] : [],
-  //       }
-  //     })
-  //       .then((stream: any) => {
-  //         localStream.getTracks().forEach((track: any) => track.stop());
-  //         setLocalStream(stream);
-  //         // localStream.getVideoTracks().forEach((track: any) => track._switchCamera());
+  useEffect(() => {
+    // InCallManager.start({ media: 'video', ringback: 'BUNDLE' })
+    InCallManager.setSpeakerphoneOn(false)
+    InCallManager.setKeepScreenOn(true)
+  }, [])
 
-  //         pc.current?.addStream(stream)
-  //         // stream.getVideoTracks().forEach((track: any) => track._switchCamera());
-  //       })
-  //       .catch(error => {
-  //         console.log(error)
-  //       });
-  //   });
-  //   // switchCamera()
-  //   // Add stream
-  //   // pc.current!.onaddstream = (event: EventOnAddStream) => {
-  //   //   setRemoteStream(event.stream)
-  //   // }
-  // }, [isFront])
+  // useEffect(() => {
+  //   InCallManager.startRingtone('DEFAULT')
+  // }, [calling])
 
   const setUp = () => {
 
@@ -112,7 +94,6 @@ const MainScreen = () => {
     //get local stream
     // let isFront = true;
     mediaDevices.enumerateDevices().then(sourceInfos => {
-      console.log(sourceInfos);
       let videoSourceId;
       for (let i = 0; i < sourceInfos.length; i++) {
         const sourceInfo = sourceInfos[i];
@@ -208,7 +189,7 @@ const MainScreen = () => {
       setCallID(item)
     });
     pc.current!.onicecandidate = (event: EventOnCandidate) => {
-      socket.current.emit('candidate', { remoteID: callID, ice: event.candidate })
+      socket.current.emit('candidate', { remoteID: item, ice: event.candidate })
       console.log('candidate', event.candidate)
     }
   }
@@ -238,11 +219,23 @@ const MainScreen = () => {
     setRemoteStream(null)
     setLocalStream(null)
     pc.current?.close()
-    setUp()
     setCallID('')
     setIsFront(true)
+    setCalling(false)
+    socket.current.emit('endcall', callID)
+    InCallManager.stopRingtone()
+    setUp()
+  }
+  const timeOut = () => {
+    timeout = setTimeout(endCall, 30000);
+  }
+  const stopTimeOut = () => {
+    clearTimeout(timeout)
   }
   if (calling) {
+    InCallManager.startRingtone('BUNDLE')
+    // timeoutendcall
+    // timeOut()
     return (
       <View>
         <ImageBackground source={require('./images/calling.jpg')} style={{ width: '100%', height: '100%' }}>
@@ -251,6 +244,8 @@ const MainScreen = () => {
               setCalling(false)
               setInCall(true)
               Answer()
+              stopTimeOut()
+              InCallManager.stopRingtone()
             }}>
               <View style={{ backgroundColor: 'green', borderRadius: 30, width: 50, height: 50, alignItems: 'center', justifyContent: 'center' }}>
                 <Icon name='phone-alt' size={25} color={'white'} ></Icon>
@@ -259,6 +254,8 @@ const MainScreen = () => {
             <TouchableOpacity onPress={() => {
               setCalling(false)
               setInCall(false)
+              endCall()
+              // socket.current.emit('endcall', callID)
             }}>
               <View style={{ backgroundColor: 'red', borderRadius: 30, width: 50, height: 50, alignItems: 'center', justifyContent: 'center' }}>
                 <Icon name='phone-slash' size={25} color={'white'} ></Icon>
@@ -293,8 +290,37 @@ const MainScreen = () => {
         <View>
           <RTCView streamURL={localStream.toURL()} style={styles.rtcRemote} mirror objectFit='cover' ></RTCView>
           <View style={styles.btnstyle}>
-            <TouchableOpacity onPress={() => { setInCall(false), setRemoteStream(null), setCallID('') }}>
-              <View style={{ backgroundColor: 'red', borderRadius: 30, width: 50, height: 50, alignItems: 'center', justifyContent: 'center' }}>
+            <TouchableOpacity onPress={() => {
+              setCamera(!camera)
+              remoteCamera()
+            }}>
+              <View style={styles.change}>
+                <Feather name={camera ? 'video' : 'video-off'} size={25} color={'white'} ></Feather>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={() => {
+              setMute(!mute)
+              Mute()
+            }}>
+              <View style={styles.change}>
+                <Icon name={mute ? 'microphone-alt' : 'microphone-alt-slash'} size={25} color={'white'} ></Icon>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={() => {
+              setIsFront(!isFront)
+              switchCamera()
+            }}>
+              <View style={styles.change}>
+                <Icon name='exchange-alt' size={25} color={'white'} ></Icon>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => {
+              endCall()
+              // socket.current.emit('endcall', callID)
+            }}>
+              <View style={{ backgroundColor: 'red', borderRadius: 30, width: 50, height: 50, alignItems: 'center', justifyContent: 'center', marginLeft: 20 }}>
                 <Icon name='phone-slash' size={25} color={'white'} ></Icon>
               </View>
             </TouchableOpacity>
@@ -306,26 +332,44 @@ const MainScreen = () => {
       return (
         <View>
           <RTCView streamURL={remoteStream.toURL()} style={styles.rtcRemote} mirror objectFit='cover' ></RTCView>
-          <RTCView streamURL={localStream.toURL()} style={styles.rtcLocal} mirror objectFit='contain' ></RTCView>
+          <RTCView streamURL={localStream.toURL()} style={styles.rtcLocal} mirror={isFront ? true : false} objectFit='contain' ></RTCView>
 
           <View style={styles.btnstyle}>
             <TouchableOpacity onPress={() => {
-              endCall()
-              socket.current.emit('endcall', callID)
+              setCamera(!camera)
+              remoteCamera()
             }}>
-              <View style={{ backgroundColor: 'red', borderRadius: 30, width: 50, height: 50, alignItems: 'center', justifyContent: 'center' }}>
-                <Icon name='phone-slash' size={25} color={'white'} ></Icon>
+              <View style={styles.change}>
+                <Feather name={camera ? 'video' : 'video-off'} size={25} color={'white'} ></Feather>
               </View>
             </TouchableOpacity>
+
             <TouchableOpacity onPress={() => {
-              // setIsFront(!isFront)
-              switchSpeaker()
+              setMute(!mute)
+              Mute()
             }}>
-              <View style={{ borderRadius: 30, width: 50, height: 50, alignItems: 'center', justifyContent: 'center' }}>
+              <View style={styles.change}>
+                <Icon name={mute ? 'microphone-alt' : 'microphone-alt-slash'} size={25} color={'white'} ></Icon>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={() => {
+              setIsFront(!isFront)
+              switchCamera()
+            }}>
+              <View style={styles.change}>
                 <Icon name='exchange-alt' size={25} color={'white'} ></Icon>
               </View>
             </TouchableOpacity>
 
+            <TouchableOpacity onPress={() => {
+              endCall()
+              // socket.current.emit('endcall', callID)
+            }}>
+              <View style={{ backgroundColor: 'red', borderRadius: 30, width: 50, height: 50, alignItems: 'center', justifyContent: 'center', marginLeft: 20 }}>
+                <Icon name='phone-slash' size={25} color={'white'} ></Icon>
+              </View>
+            </TouchableOpacity>
           </View>
         </View>
       )
@@ -354,7 +398,9 @@ const styles = StyleSheet.create({
   btnstyle: {
     position: 'absolute',
     bottom: 30,
-    left: 200
+    left: 60,
+    flexDirection: 'row',
+    // marginLeft: 50
   },
   button: {
     flexDirection: 'row',
@@ -363,5 +409,13 @@ const styles = StyleSheet.create({
     position: 'relative',
     top: Dimensions.get('screen').height - 200
 
-  }
+  },
+  change: {
+    borderRadius: 30,
+    width: 50,
+    height: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 20
+  },
 })
